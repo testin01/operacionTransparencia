@@ -70,14 +70,44 @@ class Funcionario {
     method saleEnMedios() {
       causas.forEach({ causa => causa.aumentarCostoBase(0.1) })
     }
+    
+    method escucharPropuesta(propuesta){
+        const fechaPrometida = if (puesto.aceptaTalCual(propuesta))
+            propuesta.fechaCumplimiento()
+        else
+            propuesta.fechaPresentacion().plusYears(4)
+
+        return new Promesa(
+            descripcion = propuesta.descripcion(),
+            fechaCumplimiento = fechaPrometida
+        )
+    }
 }
 
 object ejecutivo{
+    const palabrasClave = ["aumento", "impuestos", "inflacion"]
     method validarReglas(funcionario, causa) = causa.jueces().any({juez => funcionario.esAmigoDe(juez)})
 
     method mensajeDeRechazo() = "No tiene un juez amigo en la causa"
+    method aceptaTalCual(propuesta) = propuesta.contienePalabra(palabrasClave)
 }
 object ministro {
     method validarReglas(funcionario, causa) = funcionario.patrimonioActual() > (0.50 * causa.calcularPerjuicioEconomico())
     method mensajeDeRechazo() = "No tiene un patrimonio mayor al 50% del perjuicio de la causa"
+
+    method aceptaTalCual(propuesta) = propuesta.duraMenosDeUnAno()
+}
+
+class Propuesta {
+    const property descripcion
+    const property fechaCumplimiento
+    const property fechaPresentacion
+
+    method duraMenosDeUnAno() = self.fechaCumplimiento() < self.fechaPresentacion().plusYears(1)
+    method contienePalabra(palabras) = palabras.any({ palabra => self.descripcion().contains(palabra)})
+}
+
+class Promesa {
+    const property descripcion
+    const property fechaCumplimiento
 }
