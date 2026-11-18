@@ -1,1 +1,145 @@
+// testOperacionTransparencia.wtest
 import operacionTransparencia.*
+
+class ObraPublicaConPanelDePrueba inherits CausaObraPublica {
+    const juecesDePrueba
+
+    override method jueces() = juecesDePrueba
+}
+
+describe "Punto 1 - Perjuicio economico" {
+    test "Una causa conserva su caratula y sus jueces" {
+        const causa = new CausaSoborno(
+            caratula = "Soborno investigado", costoBase = 10,
+            hayArrepentidos = true, jueces = ["Juez A", "Juez B"]
+        )
+
+        assert.equals("Soborno investigado", causa.caratula())
+        assert.equals(#{"Juez A", "Juez B"}, causa.jueces().asSet())
+    }
+
+    test "Un soborno con arrepentidos suma un millon" {
+        const causa = new CausaSoborno(caratula = "Soborno", costoBase = 10, hayArrepentidos = true)
+
+        assert.equals(11, causa.calcularPerjuicioEconomico())
+    }
+
+    test "Un soborno sin arrepentidos suma dos millones" {
+        const causa = new CausaSoborno(caratula = "Soborno", costoBase = 10, hayArrepentidos = false)
+
+        assert.equals(12, causa.calcularPerjuicioEconomico())
+    }
+
+    test "La obra publica arranca con base tres y usa el mismo panel para todas las causas" {        const primera = new CausaObraPublica(caratula = "Ruta")
+        const segunda = new CausaObraPublica(caratula = "Puente")
+
+        assert.equals(3, primera.costoBase())
+        assert.equals(3, segunda.costoBase())
+        assert.that(primera.jueces().size() > 0)
+        assert.equals(primera.jueces().asSet(), segunda.jueces().asSet())
+    }
+
+    test "La obra publica con exactamente dos jueces tiene un perjuicio de cinco millones" {
+        const causa = new ObraPublicaConPanelDePrueba(
+            caratula = "Ruta", juecesDePrueba = ["Juez A", "Juez B"]
+        )
+
+        assert.equals(5, causa.calcularPerjuicioEconomico())
+    }
+
+    test "La obra publica con tres jueces conserva el perjuicio de tres millones" {
+        const causa = new ObraPublicaConPanelDePrueba(
+            caratula = "Ruta", juecesDePrueba = ["Juez A", "Juez B", "Juez C"]
+        )
+
+        assert.equals(3, causa.calcularPerjuicioEconomico())
+    }
+
+    test "Una causa compleja suma los extras de sus subcausas aun cuando estan anidadas" {
+        const soborno = new CausaSoborno(caratula = "Soborno", costoBase = 10, hayArrepentidos = true)
+        const obra = new ObraPublicaConPanelDePrueba(
+            caratula = "Ruta", juecesDePrueba = ["Juez A", "Juez B"]
+        )
+        const interna = new CausaCompleja(caratula = "Interna", costoBase = 20, causas = [obra])
+        const externa = new CausaCompleja(caratula = "Externa", costoBase = 5, causas = [soborno, interna])
+
+        assert.equals(8, externa.calcularPerjuicioEconomico())
+    }
+}
+
+describe "Punto 2 - Asignacion de causas" {
+    const causa = new CausaSoborno(
+        caratula = "Soborno investigado",
+        costoBase = 9,
+        hayArrepentidos = true,
+        jueces = ["Juez A", "Juez B"]
+    )
+    const asignadas = []
+
+    test "Rechaza al ejecutivo sin patrimonio aunque tenga un juez amigo" {
+        const funcionario = new Funcionario(
+            puesto = ejecutivo, patrimonioActual = 0, juecesAmigos = ["Juez A"], causas = asignadas
+        )
+
+        assert.throwsExceptionLike(
+            new UserException(message = "El funcionario debe tener un patrimonio positivo"),
+            { funcionario.asignarCausa(causa) }
+        )
+        assert.equals([], asignadas)
+    }
+
+    test "Al ejecutivo le basta un juez amigo entre varios" {
+        const funcionario = new Funcionario(
+            puesto = ejecutivo, patrimonioActual = 1, juecesAmigos = ["Juez B", "Juez C"], causas = asignadas
+        )
+
+        funcionario.asignarCausa(causa)
+
+        assert.equals([causa], asignadas)
+    }
+
+    test "Rechaza al ejecutivo que no tiene amigos entre los jueces de la causa" {
+        const funcionario = new Funcionario(
+            puesto = ejecutivo, patrimonioActual = 6, juecesAmigos = ["Juez C"], causas = asignadas
+        )
+
+        assert.throwsExceptionLike(
+            new UserException(message = "No tiene un juez amigo en la causa"),
+            { funcionario.asignarCausa(causa) }
+        )
+        assert.equals([], asignadas)
+    }
+
+    test "Rechaza al ministro que tiene exactamente la mitad del perjuicio" {
+        const funcionario = new Funcionario(puesto = ministro, patrimonioActual = 5, causas = asignadas)
+
+        assert.throwsExceptionLike(
+            new UserException(message = "No tiene un patrimonio mayor al 50% del perjuicio de la causa"),
+            { funcionario.asignarCausa(causa) }
+        )
+        assert.equals([], asignadas)
+    }
+
+    test "El ministro con mas de la mitad del perjuicio puede asumir la causa" {
+        const funcionario = new Funcionario(puesto = ministro, patrimonioActual = 5.01, causas = asignadas)
+
+        funcionario.asignarCausa(causa)
+
+        assert.equals([causa], asignadas)
+    }
+
+    test "Al cambiar de puesto el mismo funcionario aplica la nueva regla" {
+        const funcionario = new Funcionario(puesto = ejecutivo, patrimonioActual = 6, causas = asignadas)
+
+        assert.throwsExceptionLike(
+            new UserException(message = "No tiene un juez amigo en la causa"),
+            { funcionario.asignarCausa(causa) }
+        )
+        assert.equals([], asignadas)
+
+        funcionario.modificarPuesto(ministro)
+        funcionario.asignarCausa(causa)
+
+        assert.equals([causa], asignadas)
+    }
+}
