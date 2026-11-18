@@ -1,4 +1,6 @@
 // operacionTransparencia.wlk
+
+// Punto 1
 class Causa {
     var property costoBase
     const property caratula
@@ -6,6 +8,10 @@ class Causa {
 
     method calcularPerjuicioEconomico() = self.costoBase() + self.costoExtra()
     method costoExtra()
+
+    method aumentarCostoBase(monto) {
+        costoBase = costoBase + monto
+    }
 }
 
 class CausaCompleja inherits Causa {
@@ -30,6 +36,8 @@ class CausaObraPublica inherits Causa(costoBase = 3) {
     method cantidadDeJueces() = self.jueces().size()
 }
 
+
+// Punto 2
 class UserException inherits Exception{}
 
 class Funcionario {
@@ -53,6 +61,15 @@ class Funcionario {
     method validarPatrimonio() = patrimonioActual > 0
     method esAmigoDe(juez) = juecesAmigos.contains(juez)
     method modificarPuesto(puestoNuevo) { puesto = puestoNuevo}
+
+    // Punto 3
+    method causasQueLoDejanPegado() = causas.filter({ causa => self.loDejaPegado(causa)})
+    method loDejaPegado(causa) = self.tienePerjuicioTramboliko(causa)
+    method tienePerjuicioTramboliko(causa) = causa.calcularPerjuicioEconomico() > 5
+
+    method saleEnMedios() {
+      causas.forEach({ causa => causa.aumentarCostoBase(0.1) })
+    }
 }
 
 object ejecutivo{
