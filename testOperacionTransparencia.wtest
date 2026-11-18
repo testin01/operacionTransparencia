@@ -143,3 +143,132 @@ describe "Punto 2 - Asignacion de causas" {
         assert.equals([causa], asignadas)
     }
 }
+describe "Punto 3 - Causas y medios" {
+    const funcionario = new Funcionario(puesto = ministro, patrimonioActual = 100)
+
+    method soborno(caratula, base) = new CausaSoborno(
+        caratula = caratula, costoBase = base, hayArrepentidos = true
+    )
+
+    test "Solo devuelve las causas asignadas con perjuicio estrictamente mayor a cinco" {
+        const menor = self.soborno("Menor al limite", 3)
+        const limite = self.soborno("En el limite", 4)
+        const mayor = self.soborno("Sobre el limite", 4.1)
+        const otroFuncionario = new Funcionario(puesto = ministro, patrimonioActual = 100)
+        otroFuncionario.asignarCausa(self.soborno("Asignada a otro funcionario", 9))
+        funcionario.asignarCausa(menor)
+        funcionario.asignarCausa(limite)
+        funcionario.asignarCausa(mayor)
+
+        assert.equals(#{mayor}, funcionario.causasQueLoDejanPegado().asSet())
+    }
+
+    test "Cada aparicion suma 0.1 al costo base de todas las causas asignadas" {
+        const obra = new ObraPublicaConPanelDePrueba(
+            caratula = "Ruta", juecesDePrueba = ["Juez A", "Juez B"]
+        )
+        const soborno = self.soborno("Soborno", 7)
+        const ajena = self.soborno("Sin asignar", 4)
+        funcionario.asignarCausa(obra)
+        funcionario.asignarCausa(soborno)
+
+        funcionario.saleEnMedios()
+
+        assert.equals(3.1, obra.costoBase())
+        assert.equals(7.1, soborno.costoBase())
+
+        funcionario.saleEnMedios()
+
+        assert.equals(3.2, obra.costoBase())
+        assert.equals(7.2, soborno.costoBase())
+        assert.equals(5.2, obra.calcularPerjuicioEconomico())
+        assert.equals(4, ajena.costoBase())
+    }
+
+    test "Una causa que supera el limite despues de salir en medios entra en el filtro" {
+        const causa = self.soborno("En el limite", 4)
+        funcionario.asignarCausa(causa)
+        assert.that(funcionario.causasQueLoDejanPegado().isEmpty())
+
+        funcionario.saleEnMedios()
+
+        assert.equals(5.1, causa.calcularPerjuicioEconomico())
+        assert.equals(#{causa}, funcionario.causasQueLoDejanPegado().asSet())
+    }
+}
+
+// Interfaz de prueba del punto 4: Funcionario.escucharPropuesta devuelve la promesa.
+// Al postergar, se cuentan los cuatro anos desde la presentacion de la propuesta.
+// Los casos del Ejecutivo usan "aumento" e "impuestos" como palabras de ejemplo.
+describe "Punto 4 - Propuestas y promesas" {
+    const presentacion = new Date(day = 12, month = 3, year = 2025)
+    const finDeMandato = new Date(day = 12, month = 3, year = 2029)
+    const funcionarioEjecutivo = new Funcionario(puesto = ejecutivo, patrimonioActual = 10)
+    const funcionarioMinistro = new Funcionario(puesto = ministro, patrimonioActual = 10)
+
+    method propuesta(descripcion, vencimiento) = new Propuesta(
+        descripcion = descripcion,
+        fechaPresentacion = presentacion,
+        fechaCumplimiento = vencimiento
+    )
+
+    test "El Ejecutivo conserva la fecha si aparece una sola palabra clave" {
+        const vencimiento = new Date(day = 12, month = 9, year = 2026)
+        const propuesta = self.propuesta("Reducir impuestos a comercios", vencimiento)
+
+        const promesa = funcionarioEjecutivo.escucharPropuesta(propuesta)
+
+        assert.equals(vencimiento, promesa.fechaCumplimiento())
+        assert.equals(propuesta.descripcion(), promesa.descripcion())
+    }
+
+    test "El Ejecutivo posterga una propuesta corta sin palabras clave" {
+        const vencimiento = new Date(day = 12, month = 9, year = 2025)
+        const propuesta = self.propuesta("Renovar la plaza del barrio", vencimiento)
+
+        const promesa = funcionarioEjecutivo.escucharPropuesta(propuesta)
+
+        assert.equals(finDeMandato, promesa.fechaCumplimiento())
+        assert.equals(propuesta.descripcion(), promesa.descripcion())
+    }
+
+    test "El Ministro acepta una propuesta que dura un dia menos de un ano" {
+        const vencimiento = new Date(day = 11, month = 3, year = 2026)
+
+        const promesa = funcionarioMinistro.escucharPropuesta(
+            self.propuesta("Renovar la plaza del barrio", vencimiento)
+        )
+
+        assert.equals(vencimiento, promesa.fechaCumplimiento())
+    }
+
+    test "El Ministro posterga al cumplirse exactamente un ano aunque haya palabra clave" {
+        const vencimiento = new Date(day = 12, month = 3, year = 2026)
+
+        const promesa = funcionarioMinistro.escucharPropuesta(
+            self.propuesta("Evitar un aumento de tarifas", vencimiento)
+        )
+
+        assert.equals(finDeMandato, promesa.fechaCumplimiento())
+    }
+
+    test "El Ministro tambien posterga cuando la propuesta dura mas de un ano" {
+        const vencimiento = new Date(day = 13, month = 3, year = 2026)
+
+        const promesa = funcionarioMinistro.escucharPropuesta(
+            self.propuesta("Renovar la plaza del barrio", vencimiento)
+        )
+
+        assert.equals(finDeMandato, promesa.fechaCumplimiento())
+    }
+
+    test "Un cambio de puesto cambia la forma de decidir la fecha de la promesa" {
+        const vencimiento = new Date(day = 12, month = 9, year = 2026)
+        const propuesta = self.propuesta("Reducir impuestos a comercios", vencimiento)
+
+        assert.equals(vencimiento, funcionarioEjecutivo.escucharPropuesta(propuesta).fechaCumplimiento())
+        funcionarioEjecutivo.modificarPuesto(ministro)
+
+        assert.equals(finDeMandato, funcionarioEjecutivo.escucharPropuesta(propuesta).fechaCumplimiento())
+    }
+}
