@@ -2,16 +2,20 @@
 
 // Punto 1
 class Causa {
-    var property costoBase
+    var costoBase
     const property caratula
-    const property jueces = []
+    const property jueces = #{}
 
-    method calcularPerjuicioEconomico() = self.costoBase() + self.costoExtra()
+    method perjuicioEconomico() = costoBase + self.costoExtra()
     method costoExtra()
 
     method aumentarCostoBase(monto) {
         costoBase = costoBase + monto
     }
+    
+    method tieneJuez(juecesAmigos) = juecesAmigos.any({amigo => jueces.any(amigo)})
+
+    method trambolika() = self.perjuicioEconomico() > 5
 }
 
 class CausaCompleja inherits Causa {
@@ -21,57 +25,54 @@ class CausaCompleja inherits Causa {
 }
 
 class CausaSoborno inherits Causa {
-    const hayArrepentidos
+    var hayArrepentidos
 
     override method costoExtra() = if(hayArrepentidos) 1 else 2
-}
 
-object tribunalDeObraPublica {
-    method jueces() = ["Dr. Rodolfo Kometa", "Dr. Armando U. Nacausa"] // casos de ejemplo
+    method arrepentirse() { hayArrepentidos = true }
+    method hacerseElGil() { hayArrepentidos = false }
 }
 
 class CausaObraPublica inherits Causa(costoBase = 3) {
     override method costoExtra() = if(self.cantidadDeJueces() <= 2) 2 else 0
-    override method jueces() = tribunalDeObraPublica.jueces()
     method cantidadDeJueces() = self.jueces().size()
 }
 
 
 // Punto 2
-class UserException inherits Exception{}
-
 class Funcionario {
-    var puesto
+    var property puesto
     const property patrimonioActual
-    const juecesAmigos = []
     const causas = []
+    const propuestas = []
 
     method asignarCausa(causa) {
         if (!self.validarPatrimonio()) {
-            throw new UserException(message = "El funcionario debe tener un patrimonio positivo")
+            throw new DomainException(message = "El funcionario debe tener un patrimonio positivo")
         }
 
         if(!puesto.validarReglas(self, causa)){
-            throw new UserException(message = puesto.mensajeDeRechazo())
+            throw new DomainException(message = puesto.mensajeDeRechazo())
         }
 
         causas.add(causa)
     }
 
     method validarPatrimonio() = patrimonioActual > 0
-    method esAmigoDe(juez) = juecesAmigos.contains(juez)
     method modificarPuesto(puestoNuevo) { puesto = puestoNuevo}
 
     // Punto 3
-    method causasQueLoDejanPegado() = causas.filter({ causa => self.loDejaPegado(causa)})
-    method loDejaPegado(causa) = self.tienePerjuicioTramboliko(causa)
-    method tienePerjuicioTramboliko(causa) = causa.calcularPerjuicioEconomico() > 5
+    method causasQueLoDejanPegado() = causas.filter({ causa => causa.trambolika() })
 
     method saleEnMedios() {
       causas.forEach({ causa => causa.aumentarCostoBase(0.1) })
     }
     
-    method escucharPropuesta(propuesta){
+    method aceptaPropuesta(propuesta) {
+        if(!puesto.leGusta(propuesta)) propuesta.postergar()
+        propuestas.add(propuesta)
+    }
+/*     method escucharPropuesta(propuesta){
         const fechaPrometida = if (puesto.aceptaTalCual(propuesta))
             propuesta.fechaCumplimiento()
         else
@@ -81,33 +82,41 @@ class Funcionario {
             descripcion = propuesta.descripcion(),
             fechaCumplimiento = fechaPrometida
         )
-    }
+
+        propuestas.add(propuesta)
+    } */
 }
 
-object ejecutivo{
+class Ejecutivo{ // No todos tienen los mismos amigos
     const palabrasClave = ["aumento", "impuestos", "inflacion"]
-    method validarReglas(funcionario, causa) = causa.jueces().any({juez => funcionario.esAmigoDe(juez)})
+    const jueces = #{}
+    method validarReglas(causa) = causa.tieneJuez(jueces)
 
     method mensajeDeRechazo() = "No tiene un juez amigo en la causa"
     method aceptaTalCual(propuesta) = propuesta.contienePalabra(palabrasClave)
+
+    method leGusta(propuesta) = palabrasClave.any{palabra => propuesta.contieneDescripcion(palabra)}
 }
-object ministro {
-    method validarReglas(funcionario, causa) = funcionario.patrimonioActual() > (0.50 * causa.calcularPerjuicioEconomico())
+object ministro { // Entre ministros son iguales
+    method validarReglas(funcionario, causa) = funcionario.patrimonioActual() > (0.50 * causa.perjuicioEconomico())
     method mensajeDeRechazo() = "No tiene un patrimonio mayor al 50% del perjuicio de la causa"
 
     method aceptaTalCual(propuesta) = propuesta.duraMenosDeUnAno()
 }
 
 class Propuesta {
-    const property descripcion
-    const property fechaCumplimiento
-    const property fechaPresentacion
+    var descripcion
+    var fechaCumplimiento
+    var fechaPresentacion
 
-    method duraMenosDeUnAno() = self.fechaCumplimiento() < self.fechaPresentacion().plusYears(1)
-    method contienePalabra(palabras) = palabras.any({ palabra => self.descripcion().contains(palabra)})
+    method postergar() {
+        fechaCumplimiento = fechaCumplimiento.plusYears(4)
+    }
+    method duraMenosDeUnAno() = fechaCumplimiento < fechaPresentacion.plusYears(1)
+    method contienePalabra(palabras) = palabras.any({ palabra => descripcion.contains(palabra)})
 }
-
+/*
 class Promesa {
     const property descripcion
     const property fechaCumplimiento
-}
+} */
